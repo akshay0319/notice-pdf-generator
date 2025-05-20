@@ -95,6 +95,98 @@
 </head>
 <body>
 
+
+
+<hr>
+<h3>🧾 Create New Template</h3>
+<input type="text" id="newTemplateName" placeholder="Template Name" />
+<textarea id="newTemplateHtml" rows="6" placeholder="Paste HTML Template Here">
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;meta charset="utf-8"&gt;
+    &lt;title&gt;Legal Notice&lt;/title&gt;
+    &lt;style&gt;
+        body {
+            font-family: "Times New Roman", serif;
+            font-size: 12pt;
+            line-height: 1.6;
+            margin: 50px;
+        }
+        .header {
+            text-align: center;
+            font-size: 14pt;
+            font-weight: bold;
+            text-decoration: underline;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        .signature {
+            margin-top: 50px;
+        }
+    &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+
+    &lt;div class="header"&gt;LEGAL NOTICE&lt;/div&gt;
+
+    &lt;div class="section"&gt;
+        &lt;strong&gt;To,&lt;/strong&gt;&lt;br&gt;
+        {{ name }}&lt;br&gt;
+        {{ address }}&lt;br&gt;
+    &lt;/div&gt;
+
+    &lt;div class="section"&gt;
+        &lt;strong&gt;Subject:&lt;/strong&gt; Legal Notice for Recovery of Outstanding Loan - {{ loan_number }}
+    &lt;/div&gt;
+
+    &lt;div class="section"&gt;
+        Dear {{ name }},
+
+        &lt;p&gt;
+            This is to inform you that you have defaulted on your loan agreement (Loan No. {{ loan_number }})
+            dated {{ loan_date }}. As per the terms of the agreement, you were required to make timely payments
+            toward the outstanding amount.
+        &lt;/p&gt;
+
+        &lt;p&gt;
+            As of today, the total due stands at &lt;strong&gt;₹{{ due_amount }}&lt;/strong&gt;, which includes the
+            principal and applicable interest. Despite multiple reminders, the amount has not been settled.
+        &lt;/p&gt;
+
+        &lt;p&gt;
+            You are hereby instructed to remit the total due amount within &lt;strong&gt;7 days&lt;/strong&gt; from
+            the receipt of this notice. Failure to do so will compel us to initiate legal proceedings
+            against you at your cost and risk without any further intimation.
+        &lt;/p&gt;
+    &lt;/div&gt;
+
+    &lt;div class="section"&gt;
+        &lt;strong&gt;Notice Issued By:&lt;/strong&gt;&lt;br&gt;
+        {{ sender_name }}&lt;br&gt;
+        {{ sender_designation }}&lt;br&gt;
+        {{ sender_company }}&lt;br&gt;
+        {{ sender_contact }}
+    &lt;/div&gt;
+
+    &lt;div class="signature"&gt;
+        Sincerely,&lt;br&gt;&lt;br&gt;
+        &lt;strong&gt;{{ sender_name }}&lt;/strong&gt;&lt;br&gt;
+        {{ sender_designation }}
+    &lt;/div&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;
+</textarea>
+<button onclick="createTemplate()">💾 Save Template</button>
+
+<hr>
+<h3>🗑️ Manage Templates</h3>
+<ul id="templateList"></ul>
+
+
 <h2>📤 Generate Notices from Template</h2>
 <label>🧾 Select Template:</label>
 <select id="templatesList"></select>
@@ -118,16 +210,6 @@
 <button onclick="generate()">🚀 Generate PDF ZIP</button>
 
 <p id="timeDisplay">Time Elapsed: 0s</p>
-
-<hr>
-<h3>🧾 Create New Template</h3>
-<input type="text" id="newTemplateName" placeholder="Template Name" />
-<textarea id="newTemplateHtml" rows="6" placeholder="Paste HTML Template Here"></textarea>
-<button onclick="createTemplate()">💾 Save Template</button>
-
-<hr>
-<h3>🗑️ Manage Templates</h3>
-<ul id="templateList"></ul>
 
 <div id="popup"></div>
 
@@ -169,10 +251,40 @@
     });
   }
 
+  // async function createTemplate() {
+  //   const name = document.getElementById("newTemplateName").value.trim();
+  //   const html = document.getElementById("newTemplateHtml").value.trim();
+  //   if (!name || !html) return showPopup("⚠️ Please fill both name and HTML");
+
+  //   const res = await fetch("/templates/", {
+  //     method: "POST",
+  //     headers: { "Content-Type": "application/json" },
+  //     body: JSON.stringify({ name, html_content: html })
+  //   });
+
+  //   if (res.ok) {
+  //     showPopup("✅ Template created");
+  //     document.getElementById("newTemplateName").value = "";
+  //     document.getElementById("newTemplateHtml").value = "";
+  //     loadTemplates();
+  //   } else {
+  //     showPopup("❌ Failed to create template");
+  //   }
+  // }
+
   async function createTemplate() {
     const name = document.getElementById("newTemplateName").value.trim();
     const html = document.getElementById("newTemplateHtml").value.trim();
-    if (!name || !html) return showPopup("⚠️ Please fill both name and HTML");
+
+    if (!name || !html) {
+      return showPopup("⚠️ Please fill both name and HTML");
+    }
+
+    // ✅ Validate that at least one {{ variable }} is present
+    const hasJinjaVar = /\{\{[^}]+\}\}/.test(html);
+    if (!hasJinjaVar) {
+      return showPopup("⚠️ Template must contain at least one {{ variable }} placeholder.");
+    }
 
     const res = await fetch("/templates/", {
       method: "POST",
