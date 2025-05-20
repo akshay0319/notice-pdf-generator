@@ -1,165 +1,246 @@
-  <!DOCTYPE html>
-  <html>
-  <head>
-    <title>Notice PDF Generator</title>
-    <style>
-      body { font-family: Arial; padding: 20px; }
-      textarea, input, select, button { width: 100%; margin-bottom: 10px; padding: 8px; }
-      .template-item { display: flex; justify-content: space-between; align-items: center; }
-      .delete-btn { color: red; cursor: pointer; }
-      #popup {
-        display: none; position: fixed; top: 20px; left: 50%;
-        transform: translateX(-50%);
-        background-color: #333; color: #fff;
-        padding: 10px 20px; border-radius: 5px;
-      }
-    </style>
-  </head>
-  <body>
-
-  <h2>📤 Generate Notices from Template</h2>
-  <label>🧾 Select Template:</label>
-  <select id="templatesList"></select>
-
-  <label>👥 Paste Persons JSON:</label>
-  <textarea id="persons" rows="10">
-  [
-    {
-      "name": "John Doe",
-      "address": "123 Main St, Springfield",
-      "loan_number": "LN2023/001",
-      "loan_date": "2023-12-01",
-      "due_amount": "75,000",
-      "sender_name": "Adv. Priya Kulkarni",
-      "sender_designation": "Legal Advisor",
-      "sender_company": "XYZ Legal Group",
-      "sender_contact": "+91-9876543210"
-    }
-  ]
-  </textarea>
-  <button onclick="generate()">🚀 Generate PDF ZIP</button>
-
-  <p id="timeDisplay">Time Elapsed: 0s</p>
-
-  <hr>
-  <h3>🧾 Create New Template</h3>
-  <input type="text" id="newTemplateName" placeholder="Template Name" />
-  <textarea id="newTemplateHtml" rows="6" placeholder="Paste HTML Template Here"></textarea>
-  <button onclick="createTemplate()">💾 Save Template</button>
-
-  <hr>
-  <h3>🗑️ Manage Templates</h3>
-  <ul id="templateList"></ul>
-
-  <div id="popup"></div>
-
-  <script>
-    let timer = null;
-    let startTime = null;
-
-    function showPopup(message, duration = 3000) {
-      const popup = document.getElementById("popup");
-      popup.innerText = message;
-      popup.style.display = "block";
-      setTimeout(() => popup.style.display = "none", duration);
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Notice PDF Generator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 900px;
+      margin: auto;
+      background-color: #f9f9f9;
+      color: #333;
     }
 
-    async function loadTemplates() {
-      const res = await fetch("/templates/list");
-      if (!res.ok) return showPopup("❌ Failed to load templates");
-      const templates = await res.json();
-
-      const select = document.getElementById("templatesList");
-      select.innerHTML = "";
-      templates.forEach(t => {
-        const opt = document.createElement("option");
-        opt.value = t.id;
-        opt.innerText = `${t.name} (ID: ${t.id})`;
-        select.appendChild(opt);
-      });
-
-      const list = document.getElementById("templateList");
-      list.innerHTML = "";
-      templates.forEach(t => {
-        const li = document.createElement("li");
-        li.className = "template-item";
-        li.innerHTML = `
-          <span>${t.name} (ID: ${t.id})</span>
-          <span class="delete-btn" onclick="deleteTemplate(${t.id})">❌</span>
-        `;
-        list.appendChild(li);
-      });
+    h2, h3 {
+      color: #2c3e50;
     }
 
-    async function createTemplate() {
-      const name = document.getElementById("newTemplateName").value.trim();
-      const html = document.getElementById("newTemplateHtml").value.trim();
-      if (!name || !html) return showPopup("⚠️ Please fill both name and HTML");
-
-      const res = await fetch("/templates/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, html_content: html })
-      });
-
-      if (res.ok) {
-        showPopup("✅ Template created");
-        document.getElementById("newTemplateName").value = "";
-        document.getElementById("newTemplateHtml").value = "";
-        loadTemplates();
-      } else {
-        showPopup("❌ Failed to create template");
-      }
+    textarea, input, select, button {
+      width: 100%;
+      margin-bottom: 12px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 15px;
+      box-sizing: border-box;
     }
 
-    async function deleteTemplate(id) {
-      const res = await fetch(`/templates/${id}`, { method: "DELETE" });
-      if (res.ok) {
-        showPopup("🗑️ Template deleted");
-        loadTemplates();
-      } else {
-        showPopup("❌ Failed to delete");
-      }
+    button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
     }
 
-    async function generate() {
-      const templateId = document.getElementById("templatesList").value;
-      const persons = JSON.parse(document.getElementById("persons").value);
-
-      showPopup("⏳ Generating PDFs...");
-      document.getElementById("timeDisplay").innerText = "Time Elapsed: 0s";
-      startTime = Date.now();
-
-      timer = setInterval(() => {
-        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-        document.getElementById("timeDisplay").innerText = `Time Elapsed: ${elapsed}s`;
-      }, 1000);
-
-      const res = await fetch("/bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ template_id: templateId, persons })
-      });
-
-      clearInterval(timer);
-
-      if (!res.ok) {
-        showPopup("❌ PDF generation failed.");
-        return;
-      }
-
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "notices.zip";
-      a.click();
-
-      showPopup("✅ ZIP downloaded!");
+    button:hover {
+      background-color: #2980b9;
     }
 
-    loadTemplates();
-  </script>
+    .template-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 10px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      margin-bottom: 6px;
+    }
 
-  </body>
-  </html>
+    .delete-btn {
+      color: red;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    #popup {
+      display: none;
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #333;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 5px;
+      z-index: 1000;
+      font-weight: bold;
+    }
+
+    ul#templateList {
+      list-style: none;
+      padding: 0;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    textarea#persons {
+      font-family: monospace;
+      background-color: #fff;
+    }
+
+    hr {
+      margin: 30px 0;
+      border: 0;
+      border-top: 1px solid #ccc;
+    }
+
+    #timeDisplay {
+      font-weight: bold;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+
+<h2>📤 Generate Notices from Template</h2>
+<label>🧾 Select Template:</label>
+<select id="templatesList"></select>
+
+<label>👥 Paste Persons JSON:</label>
+<textarea id="persons" rows="10">
+[
+  {
+    "name": "John Doe",
+    "address": "123 Main St, Springfield",
+    "loan_number": "LN2023/001",
+    "loan_date": "2023-12-01",
+    "due_amount": "75,000",
+    "sender_name": "Adv. Priya Kulkarni",
+    "sender_designation": "Legal Advisor",
+    "sender_company": "XYZ Legal Group",
+    "sender_contact": "+91-9876543210"
+  }
+]
+</textarea>
+<button onclick="generate()">🚀 Generate PDF ZIP</button>
+
+<p id="timeDisplay">Time Elapsed: 0s</p>
+
+<hr>
+<h3>🧾 Create New Template</h3>
+<input type="text" id="newTemplateName" placeholder="Template Name" />
+<textarea id="newTemplateHtml" rows="6" placeholder="Paste HTML Template Here"></textarea>
+<button onclick="createTemplate()">💾 Save Template</button>
+
+<hr>
+<h3>🗑️ Manage Templates</h3>
+<ul id="templateList"></ul>
+
+<div id="popup"></div>
+
+<script>
+  let timer = null;
+  let startTime = null;
+
+  function showPopup(message, duration = 3000) {
+    const popup = document.getElementById("popup");
+    popup.innerText = message;
+    popup.style.display = "block";
+    setTimeout(() => popup.style.display = "none", duration);
+  }
+
+  async function loadTemplates() {
+    const res = await fetch("/templates/list");
+    if (!res.ok) return showPopup("❌ Failed to load templates");
+    const templates = await res.json();
+
+    const select = document.getElementById("templatesList");
+    select.innerHTML = "";
+    templates.forEach(t => {
+      const opt = document.createElement("option");
+      opt.value = t.id;
+      opt.innerText = `${t.name} (ID: ${t.id})`;
+      select.appendChild(opt);
+    });
+
+    const list = document.getElementById("templateList");
+    list.innerHTML = "";
+    templates.forEach(t => {
+      const li = document.createElement("li");
+      li.className = "template-item";
+      li.innerHTML = `
+        <span>${t.name} (ID: ${t.id})</span>
+        <span class="delete-btn" onclick="deleteTemplate(${t.id})">❌</span>
+      `;
+      list.appendChild(li);
+    });
+  }
+
+  async function createTemplate() {
+    const name = document.getElementById("newTemplateName").value.trim();
+    const html = document.getElementById("newTemplateHtml").value.trim();
+    if (!name || !html) return showPopup("⚠️ Please fill both name and HTML");
+
+    const res = await fetch("/templates/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, html_content: html })
+    });
+
+    if (res.ok) {
+      showPopup("✅ Template created");
+      document.getElementById("newTemplateName").value = "";
+      document.getElementById("newTemplateHtml").value = "";
+      loadTemplates();
+    } else {
+      showPopup("❌ Failed to create template");
+    }
+  }
+
+  async function deleteTemplate(id) {
+    const res = await fetch(`/templates/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      showPopup("🗑️ Template deleted");
+      loadTemplates();
+    } else {
+      showPopup("❌ Failed to delete");
+    }
+  }
+
+  async function generate() {
+    const templateId = document.getElementById("templatesList").value;
+    const persons = JSON.parse(document.getElementById("persons").value);
+
+    showPopup("⏳ Generating PDFs...");
+    document.getElementById("timeDisplay").innerText = "Time Elapsed: 0s";
+    startTime = Date.now();
+
+    timer = setInterval(() => {
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      document.getElementById("timeDisplay").innerText = `Time Elapsed: ${elapsed}s`;
+    }, 1000);
+
+    const res = await fetch("/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ template_id: templateId, persons })
+    });
+
+    clearInterval(timer);
+
+    if (!res.ok) {
+      showPopup("❌ PDF generation failed.");
+      return;
+    }
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "notices.zip";
+    a.click();
+
+    showPopup("✅ ZIP downloaded!");
+    setTimeout(() => {
+    document.getElementById("timeDisplay").innerText = "Time Elapsed: 0s";
+  }, 5000);
+  }
+
+  loadTemplates();
+</script>
+
+</body>
+</html>
