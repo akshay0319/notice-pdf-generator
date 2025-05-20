@@ -3,6 +3,11 @@ from app.db.database import init_db
 from app.api import templates, notices
 from app.api import generate
 from app.api import bulk
+from fastapi.staticfiles import StaticFiles
+from app.api import templates
+
+import os
+
 
 import logging
 import warnings
@@ -33,7 +38,13 @@ app.include_router(templates.router, prefix="/templates", tags=["Templates"])
 app.include_router(notices.router, prefix="/notices", tags=["Notices"])
 app.include_router(generate.router, prefix="/generate", tags=["Generate PDF"])
 app.include_router(bulk.router, prefix="/generate", tags=["Bulk PDF Generation"])
+app.mount("/ui", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static"), html=True), name="ui")
+app.include_router(templates.router)
+
 
 @app.get("/")
 def read_root():
     return {"message": "Notice PDF Generator API running"}
+from app.api import bulk
+
+app.include_router(bulk.router)

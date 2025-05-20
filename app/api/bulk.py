@@ -5,16 +5,14 @@ from app.db.models import Template
 from app.core.pdf_engine import compile_template, render_pdf_bytes
 from pydantic import BaseModel
 from typing import List
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime
 from io import BytesIO
 from zipfile import ZipFile, ZIP_DEFLATED
 import os, uuid, logging
 
-# Suppress fontTools noise
 logging.getLogger("fontTools").setLevel(logging.ERROR)
-router = APIRouter()
-
+router = APIRouter(prefix="/bulk", tags=["Bulk PDF Generator"])
 
 class PersonData(BaseModel):
     name: str
@@ -27,32 +25,23 @@ class PersonData(BaseModel):
     sender_company: str = None
     sender_contact: str = None
 
-
 class BulkNoticeRequest(BaseModel):
     template_id: int
     persons: List[PersonData]
 
-
 def generate_single_pdf(person_data: dict, template_str: str):
-    from app.core.pdf_engine import compile_template, render_pdf_bytes
-
     try:
         filename = f"{person_data.get('name', 'Unknown').replace(' ', '_')}_{uuid.uuid4().hex}.pdf"
         template = compile_template(template_str)
         html = template.render(**person_data)
-
         if not html.strip() or "<html" not in html:
-            print(f"[RENDER WARNING] HTML empty or broken for {filename}")
             return {"status": "error", "filename": filename, "content": None}
-
         pdf_bytes = render_pdf_bytes(html)
         return {"status": "success", "filename": filename, "content": pdf_bytes}
     except Exception as e:
-        print(f"[ERROR] {person_data.get('name')}: {str(e)}")
-        return {"status": "error", "filename": filename, "content": None}
+        return {"status": "error", "filename": "", "content": None}
 
-
-@router.post("/bulk")
+@router.post("")  # DO NOT CHANGE ROUTE
 async def generate_bulk_pdfs(request: BulkNoticeRequest):
     db = SessionLocal()
     template = db.query(Template).filter(Template.id == request.template_id).first()
@@ -61,27 +50,25 @@ async def generate_bulk_pdfs(request: BulkNoticeRequest):
 
     template_str = template.html_content
     persons_dict = [person.dict(exclude_none=True) for person in request.persons]
+    total = len(persons_dict)
 
     print("[Start] PDF generation...")
     start = datetime.now()
 
     success_files = []
-    with ThreadPoolExecutor(max_workers=min(os.cpu_count() * 2, 16)) as executor:
-        futures = [
-            executor.submit(generate_single_pdf, person, template_str)
-            for person in persons_dict
-        ]
+    with ProcessPoolExecutor(max_workers=min(os.cpu_count(), 8)) as executor:
+        futures = [executor.submit(generate_single_pdf, person, template_str) for person in persons_dict]
         for i, future in enumerate(as_completed(futures), 1):
             result = future.result()
             if result["status"] == "success":
                 success_files.append(result)
-            if i % 100 == 0 or i == len(persons_dict):
-                print(f"[PDF] {i}/{len(persons_dict)} done")
+            if i % 100 == 0 or i == total:
+                print(f"[PDF] {i}/{total} done")
 
-    print(f"[PDF Generation] Completed: {len(success_files)}/{len(persons_dict)}")
+    print(f"[PDF Generation] Completed: {len(success_files)}/{total}")
     print(f"[Time Taken] {(datetime.now() - start).total_seconds():.2f} sec")
 
-    # Create ZIP
+    # Stream ZIP creation in memory
     zip_stream = BytesIO()
     with ZipFile(zip_stream, "w", ZIP_DEFLATED) as zipf:
         for file in success_files:
