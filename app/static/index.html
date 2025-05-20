@@ -213,7 +213,7 @@
       document.getElementById("timeDisplay").innerText = `Time Elapsed: ${elapsed}s`;
     }, 1000);
 
-    const res = await fetch("/bulk", {
+    const res = await fetch("/generate/bulk", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ template_id: templateId, persons })
