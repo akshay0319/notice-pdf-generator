@@ -48,4 +48,4 @@ app.mount("/", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "st
 #     return {"message": "Notice PDF Generator API running"}
 
 from app.api import bulk
-app.include_router(bulk.router)
+# app.include_router(bulk.router)
