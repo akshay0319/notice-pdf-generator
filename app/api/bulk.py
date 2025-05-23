@@ -1,3 +1,4 @@
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from app.db.database import SessionLocal
@@ -10,6 +11,7 @@ from datetime import datetime
 from io import BytesIO
 from zipfile import ZipFile, ZIP_DEFLATED
 import os, uuid, logging
+import time
 
 logging.getLogger("fontTools").setLevel(logging.ERROR)
 router = APIRouter(prefix="/bulk", tags=["Bulk PDF Generator"])
@@ -31,12 +33,14 @@ class BulkNoticeRequest(BaseModel):
 
 def generate_single_pdf(person_data: dict, template_str: str):
     try:
-        filename = f"{person_data.get('name', 'Unknown').replace(' ', '_')}_{uuid.uuid4().hex}.pdf"
         template = compile_template(template_str)
         html = template.render(**person_data)
-        if not html.strip() or "<html" not in html:
-            return {"status": "error", "filename": filename, "content": None}
+
+        filename = f"{person_data.get('name', 'Unknown').replace(' ', '_')}_{uuid.uuid4().hex}.pdf"
+        start_pdf = time.time()
         pdf_bytes = render_pdf_bytes(html)
+        print(f"[Timing] PDF render time: {time.time() - start_pdf:.2f} sec")
+
         return {"status": "success", "filename": filename, "content": pdf_bytes}
     except Exception as e:
         return {"status": "error", "filename": "", "content": None}
